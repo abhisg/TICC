@@ -1,4 +1,4 @@
-#include "solver.h"
+#include "solver.hpp"
 
 void Solver::computeLLE() {
     double constant = -n/2.0*log(2*PI);
@@ -6,7 +6,7 @@ void Solver::computeLLE() {
         double logdet = -1/(2.0*log(Theta[i].determinant()));
         for(int j = 0 ; j < data.rows(); ++j){
             auto vec = (data.row(i)-mu[i]);
-            LLE(j,i) = -0.5*(vec.transpose()*Theta[i]*vec)+logdet+constant;
+            LLE(j,i) = -0.5*((vec.transpose()*Theta[i]*vec)(0,0))+logdet+constant;
         }
     }
 }
@@ -14,13 +14,13 @@ void Solver::computeLLE() {
 void Solver::Estep() {
     //compute LLE
     computeLLE();
-    vector<double> prevcost;
-    vector<double> currentcost;
-    vector<vector<int>> currentpath;
+    std::vector<double> prevcost;
+    std::vector<double> currentcost;
+    std::vector<std::vector<int>> currentpath;
     for(int i = 0 ; i < K; ++i){
         prevcost.push_back(0);
         currentcost.push_back(0);
-        vector<int> assign;
+        std::vector<int> assign;
         currentpath.push_back(assign);
     }
     int minindex = 0;
@@ -41,7 +41,7 @@ void Solver::Estep() {
             }
         }
     }
-    vector<int> optimal = currentpath[minindex];
+    std::vector<int> optimal = currentpath[minindex];
     //assign points to clusters
     for(int i = 0 ; i < K ;++i){
         assignments[i].clear();
@@ -52,14 +52,15 @@ void Solver::Estep() {
     for(int i = 0 ; i < K ; ++i) {
         if(assignments[i].size() > 0){
             //compute the mean
-            mu[i] = Eigen::MatrixXd::Zero(1,n*w);
+            mu[i].setZero(1,n*w);
             for(auto mat : assignments[i]){
                 mu[i] += mat;
             }
             mu[i] /= assignments[i].size();
             //compute the empirical covariance across w timestamps
             for(int j = 0 ; j < w; ++j){
-                auto cov = Eigen::MatrixXd::Zero(n,n);
+                Eigen::MatrixXd cov(n,n);
+                cov.setZero(n,n);
                 for(int k = 0 ; k < assignments[i].size();++k){
                     auto dat = assignments[i][k];
                     cov += (dat.block(0,j*n,1,n)-mu[i].block(0,j*n,1,n)).transpose() * (dat.block(0,0,1,n)-mu[i].block(0,0,1,n));
@@ -67,7 +68,7 @@ void Solver::Estep() {
                 cov /= assignments[i].size();
                 for(int k = j ; k < w; ++k){
                     S[i].block(k*n,(k-j)*n,n,n) = cov;
-                    S[i].block((k-j)*n,k*n,n) = cov.tranpose();
+                    S[i].block((k-j)*n,k*n,k*n,n) = cov.transpose();
                 }
             }
         }
@@ -87,12 +88,14 @@ void Solver::Mstep(){
                     eig(i,0) = (eig(i,0)+sqrt(eig(i,0) * eig(i,0) + 4*rho))*rho/2;
                 }
                 Theta[i] = decomp.eigenvectors() * (eig.asDiagonal()) * (decomp.eigenvectors().transpose());
-                auto SL = Theta[i] + U[i]
+                auto SL = Theta[i] + U[i];
                 //Z update
                 for(int j = 0 ; j < w; ++j){
-                    auto update = Eigen::MatrixXd::Zero(n,n);
-                    auto updateS = Eigen::MatrixXd::Zero(n,n);
-                    auto updateQ = Eigen::MatrixXd::Zero(n,n);
+                    Eigen::MatrixXd update(n,n);
+                    Eigen::MatrixXd updateS(n,n);
+                    Eigen::MatrixXd updateQ(n,n);
+                    updateQ.setZero(n,n);
+                    updateS.setZero(n,n);
                     for(int k = j ; k < w; ++k){
                         updateQ += (lambda.block(k*n,(k-j)*n,n,n) + lambda.block((k-j)*n,k*n,n,n).transpose());
                         updateS += rho*(SL.block(k*n,(k-j)*n,n,n) + SL.block((k-j)*n,k*n,n,n).transpose());
@@ -118,14 +121,6 @@ void Solver::Mstep(){
             }
         }
     }
-}
-
-
-
-
-
-
-
 }
 
 
