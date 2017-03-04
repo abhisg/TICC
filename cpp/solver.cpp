@@ -79,7 +79,7 @@ void Solver::Estep() {
 void Solver::Mstep(){
     //for now keep the number of iterations fixed
     int counter = 0;
-    while(counter < 1){
+    while(counter < 50){
         for(int i = 0 ; i < K ;++i) {
             if(assignments[i].size() > 0){
                 //theta update
@@ -106,9 +106,11 @@ void Solver::Mstep(){
                     for(int i1 = 0; i1 < n; ++i1){
                         for(int i2 = 0; i2 < n; ++i2){
                             if(updateS(i1,i2) > updateQ(i1,i2)){
-                                update(i1,i2) = (updateS(i1,i2) - updateQ(i1,i2))/2*(w-j);
+                                update(i1,i2) = (updateS(i1,i2) - updateQ(i1,i2))/(2*(w-j)*rho);
                             } else if(updateS(i1,i2) <  -updateQ(i1,i2)){
-                                update(i1,i2) = (updateS(i1,i2) + updateQ(i1,i2))/2*(w-j);
+                                update(i1,i2) = (updateS(i1,i2) + updateQ(i1,i2))/(2*(w-j)*rho);
+                            } else {
+                                update(i1,i2) = 0;
                             }
                         }
                     }
