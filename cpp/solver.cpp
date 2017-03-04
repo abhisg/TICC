@@ -75,6 +75,57 @@ void Solver::Estep() {
 }
 
 void Solver::Mstep(){
+    //for now keep the number of iterations fixed
+    int counter = 0;
+    while(counter < 10){
+        for(int i = 0 ; i < K ;++i) {
+            if(assignments[i].size() > 0){
+                //theta update
+                Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> decomp((Z[i]-U[i])/rho-S[i]);
+                Eigen::VectorXd eig = decomp.eigenvalues();
+                for (int i = 0; i < eig.rows(); ++i ){
+                    eig(i,0) = (eig(i,0)+sqrt(eig(i,0) * eig(i,0) + 4*rho))*rho/2;
+                }
+                Theta[i] = decomp.eigenvectors() * (eig.asDiagonal()) * (decomp.eigenvectors().transpose());
+                auto SL = Theta[i] + U[i]
+                //Z update
+                for(int j = 0 ; j < w; ++j){
+                    auto update = Eigen::MatrixXd::Zero(n,n);
+                    auto updateS = Eigen::MatrixXd::Zero(n,n);
+                    auto updateQ = Eigen::MatrixXd::Zero(n,n);
+                    for(int k = j ; k < w; ++k){
+                        updateQ += (lambda.block(k*n,(k-j)*n,n,n) + lambda.block((k-j)*n,k*n,n,n).transpose());
+                        updateS += rho*(SL.block(k*n,(k-j)*n,n,n) + SL.block((k-j)*n,k*n,n,n).transpose());
+                    }
+                    for(int i1 = 0; i1 < n; ++i1){
+                        for(int i2 = 0; i2 < n; ++i2){
+                            if(updateS(i1,i2) > updateQ(i1,i2)){
+                                update(i1,i2) = (updateS(i1,i2) - updateQ(i1,i2))/2*(w-j);
+                            } else if(updateS(i1,i2) <  -updateQ(i1,i2)){
+                                update(i1,i2) = (updateS(i1,i2) + updateQ(i1,i2))/2*(w-j);
+                            }
+                        }
+                    }
+                    for(int k = j ; k < w; ++k){
+                        Z[i].block(k*n,(k-j)*n,n,n) = update;
+                        if(j != 0){
+                            Z[i].block((k-j)*n,k*n,n,n) = update.transpose();
+                        }
+                    }
+                }
+                //U update
+                U[i] = U[i] + Theta[i] - Z[i];
+            }
+        }
+    }
+}
+
+
+
+
+
+
+
 }
 
 
