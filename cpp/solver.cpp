@@ -3,6 +3,9 @@
 
 void Solver::computeLLE() {
     double constant = -n/2.0*log(2*PI);
+    #if defined(_OPENMP)
+    #pragma omp parallel for schedule(dynamic, 32)
+    #endif
     for(int i = 0 ; i < K; ++i){
         double logdet = -1/(2.0*log(Theta[i].determinant()));
         for(int j = 0 ; j < data.rows(); ++j){
@@ -28,9 +31,9 @@ void Solver::Estep() {
     for(int i = 0 ; i < data.rows(); ++i){
         for(int j = 0 ; j < K; ++j){
             if(prevcost[minindex] + beta > prevcost[j]){
-                currentcost[j] = prevcost[j] - LLE(i,j);
+                currentcost[j] = prevcost[j] + LLE(i,j);
             } else {
-                currentcost[j] = prevcost[minindex] + beta - LLE(i,j);
+                currentcost[j] = prevcost[minindex] + beta + LLE(i,j);
                 currentpath[j] = currentpath[minindex];
             }
             currentpath[j].push_back(j);
@@ -50,6 +53,9 @@ void Solver::Estep() {
     for(int i = 0 ; i < optimal.size(); ++i){
         assignments[optimal[i]].push_back(data.row(i));
     }
+    #if defined(_OPENMP)
+    #pragma omp parallel for schedule(dynamic, 32)
+    #endif
     for(int i = 0 ; i < K ; ++i) {
         if(assignments[i].size() > 0){
             //compute the mean
@@ -58,13 +64,13 @@ void Solver::Estep() {
                 mu[i] += mat;
             }
             mu[i] /= assignments[i].size();
-            //compute the empirical covariance across w timestamps
+            //compute the empirical covariance across of timestep 0 with each other timestep in [0,w]
             Eigen::MatrixXd cov(n,n);
             for(int j = 0 ; j < w; ++j){
                 cov.setZero(n,n);
                 for(int k = 0 ; k < assignments[i].size();++k){
                     auto dat = assignments[i][k];
-                    cov += (dat.block(0,j*n,1,n)-mu[i].block(0,j*n,1,n)).transpose() * (dat.block(0,0,1,n)-mu[i].block(0,0,1,n));
+                    cov += (dat.block(0,0,1,n)-mu[i].block(0,0,1,n)).transpose() * (dat.block(0,j*n,n,n)-mu[i].block(0,j*n,n,n));
                 }
                 cov /= assignments[i].size();
                 for(int k = j ; k < w; ++k){
@@ -79,14 +85,17 @@ void Solver::Estep() {
 void Solver::Mstep(){
     //for now keep the number of iterations fixed
     int counter = 0;
-    while(counter < 50){
+    while(counter < 10){
+        #if defined(_OPENMP)
+        #pragma omp parallel for schedule(dynamic, 32)
+        #endif
         for(int i = 0 ; i < K ;++i) {
             if(assignments[i].size() > 0){
                 //theta update
                 Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> decomp((Z[i]-U[i])/rho-S[i]);
                 Eigen::VectorXd eig = decomp.eigenvalues();
                 for (int j = 0; j < eig.rows(); ++j ){
-                    eig(j,0) = eig(j,0)+sqrt(eig(j,0) * eig(j,0) + 4*rho);
+                    eig(j,0) += sqrt(eig(j,0) * eig(j,0) + 4*rho);
                 }
                 Eigen::MatrixXd D = eig.asDiagonal();
                 Eigen::MatrixXd Q = decomp.eigenvectors();
@@ -100,15 +109,22 @@ void Solver::Mstep(){
                     updateQ.setZero(n,n);
                     updateS.setZero(n,n);
                     for(int k = j ; k < w; ++k){
-                        updateQ += (lambda.block(k*n,(k-j)*n,n,n) + lambda.block((k-j)*n,k*n,n,n).transpose());
-                        updateS += rho*(SL.block(k*n,(k-j)*n,n,n) + SL.block((k-j)*n,k*n,n,n).transpose());
+                        if(j != 0){
+                            updateQ += (lambda.block(k*n,(k-j)*n,n,n) + lambda.block((k-j)*n,k*n,n,n).transpose());
+                            updateS += rho*(SL.block(k*n,(k-j)*n,n,n) + SL.block((k-j)*n,k*n,n,n).transpose());
+                        } else {
+                            updateQ += lambda.block(k*n,(k-j)*n,n,n);
+                            updateS += rho*SL.block(k*n,(k-j)*n,n,n);
+                        }
+
                     }
+                    double denom = j == 0 ? rho*w : 2*rho*(w-j);
                     for(int i1 = 0; i1 < n; ++i1){
                         for(int i2 = 0; i2 < n; ++i2){
                             if(updateS(i1,i2) > updateQ(i1,i2)){
-                                update(i1,i2) = (updateS(i1,i2) - updateQ(i1,i2))/(2*(w-j)*rho);
+                                update(i1,i2) = (updateS(i1,i2) - updateQ(i1,i2))/denom;
                             } else if(updateS(i1,i2) <  -updateQ(i1,i2)){
-                                update(i1,i2) = (updateS(i1,i2) + updateQ(i1,i2))/(2*(w-j)*rho);
+                                update(i1,i2) = (updateS(i1,i2) + updateQ(i1,i2))/denom;
                             } else {
                                 update(i1,i2) = 0;
                             }
@@ -122,7 +138,7 @@ void Solver::Mstep(){
                     }
                 }
                 //U update
-                U[i] = U[i] + Theta[i] - Z[i];
+                U[i] += Theta[i] - Z[i];
             }
         }
         counter++;
