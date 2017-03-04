@@ -1,12 +1,13 @@
 #include "solver.hpp"
+#include <iostream>
 
 void Solver::computeLLE() {
     double constant = -n/2.0*log(2*PI);
     for(int i = 0 ; i < K; ++i){
         double logdet = -1/(2.0*log(Theta[i].determinant()));
         for(int j = 0 ; j < data.rows(); ++j){
-            auto vec = (data.row(i)-mu[i]);
-            LLE(j,i) = -0.5*((vec.transpose()*Theta[i]*vec)(0,0))+logdet+constant;
+            auto vec = (data.row(j)-mu[i]);
+            LLE(j,i) = -0.5*((vec*Theta[i]*vec.transpose())(0,0))+constant+logdet;
         }
     }
 }
@@ -58,8 +59,8 @@ void Solver::Estep() {
             }
             mu[i] /= assignments[i].size();
             //compute the empirical covariance across w timestamps
+            Eigen::MatrixXd cov(n,n);
             for(int j = 0 ; j < w; ++j){
-                Eigen::MatrixXd cov(n,n);
                 cov.setZero(n,n);
                 for(int k = 0 ; k < assignments[i].size();++k){
                     auto dat = assignments[i][k];
@@ -68,7 +69,7 @@ void Solver::Estep() {
                 cov /= assignments[i].size();
                 for(int k = j ; k < w; ++k){
                     S[i].block(k*n,(k-j)*n,n,n) = cov;
-                    S[i].block((k-j)*n,k*n,k*n,n) = cov.transpose();
+                    S[i].block((k-j)*n,k*n,n,n) = cov.transpose();
                 }
             }
         }
@@ -78,16 +79,18 @@ void Solver::Estep() {
 void Solver::Mstep(){
     //for now keep the number of iterations fixed
     int counter = 0;
-    while(counter < 10){
+    while(counter < 1){
         for(int i = 0 ; i < K ;++i) {
             if(assignments[i].size() > 0){
                 //theta update
                 Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> decomp((Z[i]-U[i])/rho-S[i]);
                 Eigen::VectorXd eig = decomp.eigenvalues();
-                for (int i = 0; i < eig.rows(); ++i ){
-                    eig(i,0) = (eig(i,0)+sqrt(eig(i,0) * eig(i,0) + 4*rho))*rho/2;
+                for (int j = 0; j < eig.rows(); ++j ){
+                    eig(j,0) = eig(j,0)+sqrt(eig(j,0) * eig(j,0) + 4*rho);
                 }
-                Theta[i] = decomp.eigenvectors() * (eig.asDiagonal()) * (decomp.eigenvectors().transpose());
+                Eigen::MatrixXd D = eig.asDiagonal();
+                Eigen::MatrixXd Q = decomp.eigenvectors();
+                Theta[i] = rho/2.0 * Q * D * Q.transpose();
                 auto SL = Theta[i] + U[i];
                 //Z update
                 for(int j = 0 ; j < w; ++j){
@@ -120,6 +123,7 @@ void Solver::Mstep(){
                 U[i] = U[i] + Theta[i] - Z[i];
             }
         }
+        counter++;
     }
 }
 

@@ -1,8 +1,9 @@
 #ifndef SOLVER_H_
 #define SOLVER_H_
 
-#include<vector>
-#include<cmath>
+#include <vector>
+#include <cmath>
+#include <iostream>
 #include "Eigen/Core"
 #include "Eigen/Eigen"
 #define PI 3.14159265358979323846
@@ -31,13 +32,13 @@ class Solver
 
     public:
         Solver(int K, double beta, double rho, Eigen::MatrixXd data, Eigen::MatrixXd lambda, int n, int w,std::vector<Eigen::MatrixXd> init_mu,std::vector<Eigen::MatrixXd> init_theta) {
-            K = this->K;
-            beta = this->beta;
-            rho = this->rho;
-            data = this->data;
-            lambda = this->lambda;
-            n = this->n;
-            w = this->w;
+            this->K = K;
+            this->beta = beta;
+            this->rho = rho;
+            this->data = data;
+            this->lambda = lambda;
+            this->n = n;
+            this->w = w;
             for(int i = 0 ; i < K ;++i){
                 Theta.push_back(init_theta[i]);
                 Eigen::MatrixXd mat(n*w,n*w);
@@ -47,20 +48,23 @@ class Solver
                 S.push_back(mat);
                 mu.push_back(init_mu[i]);
                 std::vector<Eigen::MatrixXd> vec;
+                vec.clear();
                 assignments.push_back(vec);
             }
             LLE = Eigen::MatrixXd(data.rows(),K);
             LLE.setZero(data.rows(),K);
         }
 
-        std::vector<Eigen::MatrixXd> Solve(int steps) {
+        void Solve(int steps) {
             //M step is called before E step since the initialisation would have already been done
             for(int i = 0 ; i < steps; ++i){
-                Mstep();
                 Estep();
+                Mstep();
             }
-            Mstep();
-            return Theta;
+        }
+
+        Eigen::MatrixXd obtainTheta(int idx){
+            return Theta[idx];
         }
 };
             
