@@ -7,10 +7,10 @@ act = []
 for i in xrange(len(data)-5):
     act.append(np.hstack(data[i:i+5,:]))
 act = np.array(act)
-beta = 25
+beta = 1
 K = 3
 rho = 1
-lamb = np.full((25,25),0.05)
+lamb = np.full((25,25),0.01)
 n = 5
 w = 5
 init_mu = NumpyList()
@@ -18,11 +18,14 @@ init_theta = NumpyList()
 v1 = act.T
 for i in xrange(3):
     v = np.random.rand(25,25)
-    init_mu.push_back(np.mean(act[192*i:192*i+192,:],axis=0).reshape(1,25))
+    init_mu.push_back(np.mean(act[200*i:min(200*(i+1),len(act)),:],axis=0).reshape(1,25))
     #init_mu.push_back(np.random.rand(1,25))
-    init_theta.push_back(np.cov(v1[:,192*i:192*i+192]))
+    init_theta.push_back(np.linalg.inv(np.cov(act[200*i:min(200*(i+1),len(act)),:],rowvar=False)))
 obj = Solver(K,beta,rho,act,lamb,n,w,init_mu,init_theta)
-obj.Solve(50)
+obj.Solve(4)
 t1,t2,t3 = obj.obtainTheta(0),obj.obtainTheta(1),obj.obtainTheta(2)
-for t in t1:
-    print t
+v1 = np.around(t1,3)
+v2 = np.around(np.cov(act[:min(200,len(act)),:],rowvar=False),3)
+ass = obj.obtainAssignment();
+print [a for a in ass]
+

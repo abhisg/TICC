@@ -31,9 +31,9 @@ void Solver::Estep() {
     for(int i = 0 ; i < data.rows(); ++i){
         for(int j = 0 ; j < K; ++j){
             if(prevcost[minindex] + beta > prevcost[j]){
-                currentcost[j] = prevcost[j] + LLE(i,j);
+                currentcost[j] = prevcost[j] - LLE(i,j);
             } else {
-                currentcost[j] = prevcost[minindex] + beta + LLE(i,j);
+                currentcost[j] = prevcost[minindex] + beta - LLE(i,j);
                 currentpath[j] = currentpath[minindex];
             }
             currentpath[j].push_back(j);
@@ -45,13 +45,13 @@ void Solver::Estep() {
             }
         }
     }
-    std::vector<int> optimal = currentpath[minindex];
+    current_optimal = currentpath[minindex];
     //assign points to clusters
     for(int i = 0 ; i < K ;++i){
         assignments[i].clear();
     }
-    for(int i = 0 ; i < optimal.size(); ++i){
-        assignments[optimal[i]].push_back(data.row(i));
+    for(int i = 0 ; i < current_optimal.size(); ++i){
+        assignments[current_optimal[i]].push_back(data.row(i));
     }
     #if defined(_OPENMP)
     #pragma omp parallel for schedule(dynamic, 32)
@@ -65,8 +65,14 @@ void Solver::Estep() {
             }
             mu[i] /= assignments[i].size();
             //compute the empirical covariance across of timestep 0 with each other timestep in [0,w]
-            Eigen::MatrixXd cov(n,n);
-            for(int j = 0 ; j < w; ++j){
+            Eigen::MatrixXd cov(n*w,n*w);
+            cov.setZero(n*w,n*w);
+            for(auto mat : assignments[i]) {
+                cov += (mat-mu[i]).transpose() * (mat-mu[i]);
+            }
+            S[i] = cov/assignments[i].size();
+
+            /*for(int j = 0 ; j < w; ++j){
                 cov.setZero(n,n);
                 for(int k = 0 ; k < assignments[i].size();++k){
                     auto dat = assignments[i][k];
@@ -77,7 +83,7 @@ void Solver::Estep() {
                     S[i].block(k*n,(k-j)*n,n,n) = cov;
                     S[i].block((k-j)*n,k*n,n,n) = cov.transpose();
                 }
-            }
+            }*/
         }
     }
 }

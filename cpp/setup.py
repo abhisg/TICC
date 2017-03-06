@@ -12,7 +12,7 @@ solver_module = Extension('_solver',
                         sources = [cwd+'/solver.i', cwd+'/solver.cpp'],
                         include_dirs = [cwd+'/Eigen/'],
                         swig_opts = ['-c++','-I '+cwd+'/solver.i'],
-                        extra_compile_args = ['-Wall','-O2','-pg','-std=c++11', '-fopenmp', '-ftree-vectorize','-fPIC'],
+                        extra_compile_args = ['-O2','-pg','-std=c++11', '-fopenmp', '-ftree-vectorize','-fPIC'],
                         extra_link_args = ['-lrt','-lgomp'] #required for older glibc versions
                            )
 

@@ -17,6 +17,7 @@ class Solver
         std::vector<Eigen::MatrixXd> U;
         std::vector<Eigen::MatrixXd> S;
         std::vector<std::vector<Eigen::MatrixXd> > assignments;
+        std::vector<int> current_optimal;
         Eigen::MatrixXd LLE;
 
         int K; //number of clusters
@@ -51,6 +52,7 @@ class Solver
                 vec.clear();
                 assignments.push_back(vec);
             }
+            current_optimal.clear();
             LLE = Eigen::MatrixXd(data.rows(),K);
             LLE.setZero(data.rows(),K);
         }
@@ -65,6 +67,10 @@ class Solver
 
         Eigen::MatrixXd obtainTheta(int idx){
             return Theta[idx];
+        }
+        
+        std::vector<int> obtainAssignment(){
+            return current_optimal;
         }
 };
             

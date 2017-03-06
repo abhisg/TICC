@@ -15,6 +15,7 @@
 %eigen_typemaps(Eigen::MatrixXd)
 
 namespace std {
+   %template(IntList) vector<int>;
    %template(NumpyList) vector<Eigen::MatrixXd>;
    %template(Numpy2DList) vector<vector<Eigen::MatrixXd> >;
 }
