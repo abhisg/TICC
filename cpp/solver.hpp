@@ -2,7 +2,10 @@
 #define SOLVER_H_
 
 #include <vector>
+#include <map>
+#include <unordered_set>
 #include <cmath>
+#include <cstdlib>
 #include <iostream>
 #include "Eigen/Core"
 #include "Eigen/Eigen"
@@ -58,9 +61,20 @@ class Solver
         }
 
         void Solve(int steps) {
-            //M step is called before E step since the initialisation would have already been done
-            for(int i = 0 ; i < steps; ++i){
+            bool converged = false;
+            for(int i = 0 ; i < steps && !converged; ++i){
+                auto old_optimal = current_optimal;
                 Estep();
+                if(i != 0){
+                    converged = true;
+                    for(int j = 0; j < old_optimal.size(); ++j){
+                        if(old_optimal[j] != current_optimal[j]) {
+                            std::cout << old_optimal[j] << " not equal to " << current_optimal[j] << " at " << j << "\n";
+                            converged = false;
+                            break;
+                        }
+                    }
+                }
                 Mstep();
             }
         }

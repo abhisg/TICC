@@ -46,6 +46,33 @@ void Solver::Estep() {
         }
     }
     current_optimal = currentpath[minindex];
+    
+    //provide points to empty clusters
+    std::map<int,int> cluster_count;
+    std::unordered_set<int> assigned_points;
+    for(int i = 0 ; i < K; ++i){
+        cluster_count[i] = 0;
+    }
+    for(auto cluster : current_optimal) {
+        cluster_count[cluster]++;
+    }
+    for(int i = 0 ; i < K ; ++i){
+        if (cluster_count[i] == 0) {
+            //pick one point and its adjancent timestep randomly and assign to the new cluster
+            int counter = 0;
+            while(counter < current_optimal.size()){
+                int rand_idx = rand() % (data.rows()-1);
+                if(assigned_points.find(rand_idx) == assigned_points.end()) {
+                    current_optimal[rand_idx] = i;
+                    current_optimal[rand_idx+1] = i;
+                    assigned_points.insert(rand_idx);
+                    assigned_points.insert(rand_idx+1);
+                    break;
+                }
+                counter++;
+            }
+        }
+    }
     //assign points to clusters
     for(int i = 0 ; i < K ;++i){
         assignments[i].clear();
@@ -57,6 +84,7 @@ void Solver::Estep() {
     #pragma omp parallel for schedule(dynamic, 32)
     #endif
     for(int i = 0 ; i < K ; ++i) {
+        std::cout << i << " " << assignments[i].size() << " ";
         if(assignments[i].size() > 0){
             //compute the mean
             mu[i].setZero(1,n*w);
@@ -65,33 +93,20 @@ void Solver::Estep() {
             }
             mu[i] /= assignments[i].size();
             //compute the empirical covariance across of timestep 0 with each other timestep in [0,w]
-            Eigen::MatrixXd cov(n*w,n*w);
-            cov.setZero(n*w,n*w);
+            S[i].setZero(n*w,n*w);
             for(auto mat : assignments[i]) {
-                cov += (mat-mu[i]).transpose() * (mat-mu[i]);
+                S[i] += (mat-mu[i]).transpose() * (mat-mu[i]);
             }
-            S[i] = cov/assignments[i].size();
-
-            /*for(int j = 0 ; j < w; ++j){
-                cov.setZero(n,n);
-                for(int k = 0 ; k < assignments[i].size();++k){
-                    auto dat = assignments[i][k];
-                    cov += (dat.block(0,0,1,n)-mu[i].block(0,0,1,n)).transpose() * (dat.block(0,j*n,n,n)-mu[i].block(0,j*n,n,n));
-                }
-                cov /= assignments[i].size();
-                for(int k = j ; k < w; ++k){
-                    S[i].block(k*n,(k-j)*n,n,n) = cov;
-                    S[i].block((k-j)*n,k*n,n,n) = cov.transpose();
-                }
-            }*/
+            S[i] /= assignments[i].size();
         }
     }
+    std::cout << "\n";
 }
 
 void Solver::Mstep(){
     //for now keep the number of iterations fixed
     int counter = 0;
-    while(counter < 10){
+    while(counter < 1000){
         #if defined(_OPENMP)
         #pragma omp parallel for schedule(dynamic, 32)
         #endif
@@ -115,16 +130,10 @@ void Solver::Mstep(){
                     updateQ.setZero(n,n);
                     updateS.setZero(n,n);
                     for(int k = j ; k < w; ++k){
-                        if(j != 0){
-                            updateQ += (lambda.block(k*n,(k-j)*n,n,n) + lambda.block((k-j)*n,k*n,n,n).transpose());
-                            updateS += rho*(SL.block(k*n,(k-j)*n,n,n) + SL.block((k-j)*n,k*n,n,n).transpose());
-                        } else {
-                            updateQ += lambda.block(k*n,(k-j)*n,n,n);
-                            updateS += rho*SL.block(k*n,(k-j)*n,n,n);
-                        }
-
+                        updateQ += (lambda.block(k*n,(k-j)*n,n,n) + lambda.block((k-j)*n,k*n,n,n).transpose());
+                        updateS += rho*(SL.block(k*n,(k-j)*n,n,n) + SL.block((k-j)*n,k*n,n,n).transpose());
                     }
-                    double denom = j == 0 ? rho*w : 2*rho*(w-j);
+                    double denom = 2*rho*(w-j);
                     for(int i1 = 0; i1 < n; ++i1){
                         for(int i2 = 0; i2 < n; ++i2){
                             if(updateS(i1,i2) > updateQ(i1,i2)){
@@ -138,9 +147,7 @@ void Solver::Mstep(){
                     }
                     for(int k = j ; k < w; ++k){
                         Z[i].block(k*n,(k-j)*n,n,n) = update;
-                        if(j != 0){
-                            Z[i].block((k-j)*n,k*n,n,n) = update.transpose();
-                        }
+                        Z[i].block((k-j)*n,k*n,n,n) = update.transpose();
                     }
                 }
                 //U update
