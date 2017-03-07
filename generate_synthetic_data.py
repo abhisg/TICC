@@ -9,7 +9,7 @@ sparsity_inv_matrix = 0.2
 rand_seed = 10
 number_of_clusters = 3
 cluster_ids = [0,1,2]
-break_points = np.array([1,2,3])*200
+break_points = np.array([1,2,3])*500
 save_inverse_covarainces = True
 out_file_name = "Synthetic Data Matrix rand_seed =[0,1] generated2.csv"
 ###########################################################

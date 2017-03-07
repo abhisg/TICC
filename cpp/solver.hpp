@@ -69,7 +69,6 @@ class Solver
                     converged = true;
                     for(int j = 0; j < old_optimal.size(); ++j){
                         if(old_optimal[j] != current_optimal[j]) {
-                            std::cout << old_optimal[j] << " not equal to " << current_optimal[j] << " at " << j << "\n";
                             converged = false;
                             break;
                         }

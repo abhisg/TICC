@@ -2,15 +2,19 @@
 #include <iostream>
 
 void Solver::computeLLE() {
-    double constant = -n/2.0*log(2*PI);
     #if defined(_OPENMP)
     #pragma omp parallel for schedule(dynamic, 32)
     #endif
     for(int i = 0 ; i < K; ++i){
-        double logdet = -1/(2.0*log(Theta[i].determinant()));
+        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> decomp(Theta[i]);
+        double logdet = 0;
+        Eigen::VectorXd eig = decomp.eigenvalues();
+        for (int j = 0; j < eig.rows(); ++j ){
+            logdet += log(eig(j,0));
+        }
         for(int j = 0 ; j < data.rows(); ++j){
             auto vec = (data.row(j)-mu[i]);
-            LLE(j,i) = -0.5*((vec*Theta[i]*vec.transpose())(0,0))+constant+logdet;
+            LLE(j,i) = -0.5*((vec*Theta[i]*vec.transpose())(0,0))+logdet;
         }
     }
 }
@@ -25,16 +29,18 @@ void Solver::Estep() {
         prevcost.push_back(0);
         currentcost.push_back(0);
         std::vector<int> assign;
+        assign.clear();
         currentpath.push_back(assign);
     }
     int minindex = 0;
     for(int i = 0 ; i < data.rows(); ++i){
+        auto previouspath = currentpath;
         for(int j = 0 ; j < K; ++j){
             if(prevcost[minindex] + beta > prevcost[j]){
                 currentcost[j] = prevcost[j] - LLE(i,j);
             } else {
                 currentcost[j] = prevcost[minindex] + beta - LLE(i,j);
-                currentpath[j] = currentpath[minindex];
+                currentpath[j] = previouspath[minindex];
             }
             currentpath[j].push_back(j);
         }
@@ -84,7 +90,6 @@ void Solver::Estep() {
     #pragma omp parallel for schedule(dynamic, 32)
     #endif
     for(int i = 0 ; i < K ; ++i) {
-        std::cout << i << " " << assignments[i].size() << " ";
         if(assignments[i].size() > 0){
             //compute the mean
             mu[i].setZero(1,n*w);
@@ -100,13 +105,12 @@ void Solver::Estep() {
             S[i] /= assignments[i].size();
         }
     }
-    std::cout << "\n";
 }
 
 void Solver::Mstep(){
     //for now keep the number of iterations fixed
     int counter = 0;
-    while(counter < 1000){
+    while(counter < 20){
         #if defined(_OPENMP)
         #pragma omp parallel for schedule(dynamic, 32)
         #endif
@@ -123,12 +127,13 @@ void Solver::Mstep(){
                 Theta[i] = rho/2.0 * Q * D * Q.transpose();
                 auto SL = Theta[i] + U[i];
                 //Z update
+                Eigen::MatrixXd update(n,n);
+                Eigen::MatrixXd updateS(n,n);
+                Eigen::MatrixXd updateQ(n,n);
                 for(int j = 0 ; j < w; ++j){
-                    Eigen::MatrixXd update(n,n);
-                    Eigen::MatrixXd updateS(n,n);
-                    Eigen::MatrixXd updateQ(n,n);
                     updateQ.setZero(n,n);
                     updateS.setZero(n,n);
+                    update.setZero(n,n);
                     for(int k = j ; k < w; ++k){
                         updateQ += (lambda.block(k*n,(k-j)*n,n,n) + lambda.block((k-j)*n,k*n,n,n).transpose());
                         updateS += rho*(SL.block(k*n,(k-j)*n,n,n) + SL.block((k-j)*n,k*n,n,n).transpose());
@@ -136,9 +141,9 @@ void Solver::Mstep(){
                     double denom = 2*rho*(w-j);
                     for(int i1 = 0; i1 < n; ++i1){
                         for(int i2 = 0; i2 < n; ++i2){
-                            if(updateS(i1,i2) > updateQ(i1,i2)){
+                            if(updateS(i1,i2) - updateQ(i1,i2) > 0){
                                 update(i1,i2) = (updateS(i1,i2) - updateQ(i1,i2))/denom;
-                            } else if(updateS(i1,i2) <  -updateQ(i1,i2)){
+                            } else if(updateS(i1,i2) + updateQ(i1,i2) < 0){
                                 update(i1,i2) = (updateS(i1,i2) + updateQ(i1,i2))/denom;
                             } else {
                                 update(i1,i2) = 0;
