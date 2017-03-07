@@ -49,7 +49,7 @@ void Solver::Estep() {
     
     //provide points to empty clusters
     std::map<int,int> cluster_count;
-    std::unordered_set<int> assigned_points;
+    std::set<int> assigned_points;
     for(int i = 0 ; i < K; ++i){
         cluster_count[i] = 0;
     }
