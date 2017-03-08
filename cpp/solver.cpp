@@ -67,12 +67,12 @@ void Solver::Estep() {
             //pick one point and its adjancent timestep randomly and assign to the new cluster
             int counter = 0;
             while(counter < current_optimal.size()){
-                int rand_idx = rand() % (data.rows()-1);
+                int rand_idx = rand() % (data.rows()-5);
                 if(assigned_points.find(rand_idx) == assigned_points.end()) {
-                    current_optimal[rand_idx] = i;
-                    current_optimal[rand_idx+1] = i;
-                    assigned_points.insert(rand_idx);
-                    assigned_points.insert(rand_idx+1);
+                    for(int j = 0 ; j < 5; ++j){
+                        current_optimal[rand_idx+j] = i;
+                        assigned_points.insert(rand_idx+j);
+                    }
                     break;
                 }
                 counter++;
@@ -110,7 +110,7 @@ void Solver::Estep() {
 void Solver::Mstep(){
     //for now keep the number of iterations fixed
     int counter = 0;
-    while(counter < 20){
+    while(counter < 100){
         #if defined(_OPENMP)
         #pragma omp parallel for schedule(dynamic, 32)
         #endif
@@ -141,9 +141,9 @@ void Solver::Mstep(){
                     double denom = 2*rho*(w-j);
                     for(int i1 = 0; i1 < n; ++i1){
                         for(int i2 = 0; i2 < n; ++i2){
-                            if(updateS(i1,i2) - updateQ(i1,i2) > 0){
+                            if(updateS(i1,i2) > updateQ(i1,i2) ){
                                 update(i1,i2) = (updateS(i1,i2) - updateQ(i1,i2))/denom;
-                            } else if(updateS(i1,i2) + updateQ(i1,i2) < 0){
+                            } else if(updateS(i1,i2) < -updateQ(i1,i2)){
                                 update(i1,i2) = (updateS(i1,i2) + updateQ(i1,i2))/denom;
                             } else {
                                 update(i1,i2) = 0;
