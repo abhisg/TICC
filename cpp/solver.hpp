@@ -23,6 +23,7 @@ class Solver
         std::vector<int> current_optimal;
         Eigen::MatrixXd LLE;
 
+        int sweep_length; //contiguous points assigned to the empty cluster
         int K; //number of clusters
         double beta; //switching penalty
         double rho; //regularisation constant
@@ -35,7 +36,8 @@ class Solver
         void Mstep();
 
     public:
-        Solver(int K, double beta, double rho, Eigen::MatrixXd data, Eigen::MatrixXd lambda, int n, int w,std::vector<Eigen::MatrixXd> init_mu,std::vector<Eigen::MatrixXd> init_theta) {
+        Solver(int sweep_length, int K, double beta, double rho, Eigen::MatrixXd data, Eigen::MatrixXd lambda, int n, int w,std::vector<Eigen::MatrixXd> init_mu,std::vector<Eigen::MatrixXd> init_theta) {
+            this->sweep_length = sweep_length;
             this->K = K;
             this->beta = beta;
             this->rho = rho;

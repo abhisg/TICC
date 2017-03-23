@@ -62,20 +62,29 @@ void Solver::Estep() {
     for(auto cluster : current_optimal) {
         cluster_count[cluster]++;
     }
+    //find the cluster with maximum assignments
+    int largest_cluster = 0;
+    for(auto cluster : current_optimal) {
+        if (cluster_count[cluster] > cluster_count[largest_cluster]){
+            largest_cluster = cluster;
+        }
+    }
     for(int i = 0 ; i < K ; ++i){
+        std::cout << "count " << i << " " << cluster_count[i] << "\n";
+        int j = 0;
         if (cluster_count[i] == 0) {
-            //pick one point and its adjancent timestep randomly and assign to the new cluster
-            int counter = 0;
-            while(counter < current_optimal.size()){
-                int rand_idx = rand() % (data.rows()-5);
-                if(assigned_points.find(rand_idx) == assigned_points.end()) {
-                    for(int j = 0 ; j < 5; ++j){
-                        current_optimal[rand_idx+j] = i;
-                        assigned_points.insert(rand_idx+j);
+            //pick a segment from the largest cluster and reassign it to the empty cluster
+            while (j < current_optimal.size() - sweep_length) {
+                if (current_optimal[j] == largest_cluster) {
+                    std::cout << "cluster " << i << " " << j << " " << largest_cluster << "\n";
+                    for(int k = j ; k < j + sweep_length;++k) {
+                        current_optimal[k] = i;
                     }
+                    j += sweep_length;
                     break;
+                } else {
+                    j++;
                 }
-                counter++;
             }
         }
     }
